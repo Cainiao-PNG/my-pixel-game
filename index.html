@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>森林奇遇 - 最终优化版</title>
+    <style>
+        :root {
+            --canvas-width: 800;
+            --canvas-height: 600;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+        }
+
+        html, body {
+            width: 100%; height: 100%;
+            overflow: hidden;
+            position: fixed;
+            top: 0; left: 0;
+            background: #1a1a2e;
+            touch-action: manipulation;
+            overscroll-behavior: none;
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        }
+
+        #game-wrapper {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            transform-origin: center center;
+            flex-shrink: 0;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 800px;
+            height: 600px;
+            image-rendering: auto;
+            border-radius: 4px;
+            box-shadow: 0 0 40px rgba(0,0,0,0.5);
+        }
+
+        /* 方向键 */
+        #dpad-container {
+            position: absolute;
+            left: 12px;
+            bottom: 80px;
+            width: 180px; height: 180px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .dpad-btn {
+            position: absolute;
+            width: 64px; height: 64px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.5);
+            color: rgba(255,255,255,0.9);
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: background 0.1s, transform 0.1s;
+            touch-action: manipulation;
+            outline: none;
+            -webkit-backdrop-filter: blur(4px);
+            backdrop-filter: blur(4px);
+        }
+
+        .dpad-btn:active, .dpad-btn.pressed {
+            background: rgba(255,255,255,0.45);
+            transform: scale(0.9);
+            border-color: rgba(255,255,255,0.8);
+        }
+
+        #btn-up { top: 0; left: 58px; }
+        #btn-down { bottom: 0; left: 58px; }
+        #btn-left { top: 58px; left: 0; }
+        #btn-right { top: 58px; right: 0; }
+
+        .dpad-arrow { pointer-events: none; line-height: 1; }
+
+        /* 红色区域对话框 */
+        #dialog-options {
+            position: absolute;
+            right: 40px; top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            z-index: 20;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        #dialog-options.visible { opacity: 1; pointer-events: auto; }
+
+        .dialog-btn {
+            padding: 14px 28px;
+            border-radius: 28px;
+            background: rgba(20,20,40,0.75);
+            border: 1.5px solid rgba(255,255,255,0.5);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: background 0.2s, transform 0.15s;
+            -webkit-backdrop-filter: blur(8px);
+            backdrop-filter: blur(8px);
+            text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            min-width: 150px;
+            text-align: center;
+        }
+        .dialog-btn:active { background: rgba(255,255,255,0.25); transform: scale(0.94); }
+
+        #btn-pursuit { border-color: rgba(255,180,100,0.7); background: rgba(180,60,30,0.55); }
+        #btn-lookaround { border-color: rgba(150,200,255,0.6); background: rgba(30,60,120,0.5); }
+
+        /* 提示消息 */
+        #toast-message {
+            position: absolute;
+            top: 30px; left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 28px;
+            border-radius: 22px;
+            background: rgba(0,0,0,0.75);
+            color: #fff;
+            font-size: 15px;
+            white-space: nowrap;
+            z-index: 30;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.4s;
+            -webkit-backdrop-filter: blur(4px);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        #toast-message.show { opacity: 1; }
+
+        /* 初始对话 */
+        #initial-dialog {
+            position: absolute;
+            bottom: 30px; left: 50%;
+            transform: translateX(-50%);
+            width: 560px; max-width: 90%;
+            padding: 16px 24px;
+            border-radius: 16px;
+            background: rgba(10,10,25,0.85);
+            border: 2px solid rgba(255,255,255,0.45);
+            color: #fff;
+            font-size: 16px;
+            text-align: center;
+            z-index: 40;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            line-height: 1.5;
+            transition: opacity 0.3s;
+            -webkit-backdrop-filter: blur(6px);
+            backdrop-filter: blur(6px);
+            text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+        }
+        #initial-dialog.hidden { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(20px); }
+        #initial-dialog .hint-text { font-size: 12px; opacity: 0.7; margin-top: 6px; }
+
+        #loading-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            z-index: 50;
+            pointer-events: none;
+            color: #fff;
+            font-size: 16px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 4px;
+            transition: opacity 0.5s;
+            gap: 12px;
+        }
+        #loading-overlay.done { opacity: 0; }
+        #loading-detail { font-size: 13px; opacity: 0.8; max-width: 400px; text-align: center; line-height: 1.5; }
+    </style>
+</head>
+<body>
+<div id="game-wrapper">
+    <div id="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+
+        <div id="dpad-container">
+            <button class="dpad-btn" id="btn-up"><span class="dpad-arrow">▲</span></button>
+            <button class="dpad-btn" id="btn-down"><span class="dpad-arrow">▼</span></button>
+            <button class="dpad-btn" id="btn-left"><span class="dpad-arrow">◀</span></button>
+            <button class="dpad-btn" id="btn-right"><span class="dpad-arrow">▶</span></button>
+        </div>
+
+        <div id="dialog-options">
+            <button class="dialog-btn" id="btn-pursuit">继续追击</button>
+            <button class="dialog-btn" id="btn-lookaround">四处看看</button>
+        </div>
+
+        <div id="toast-message"></div>
+
+        <div id="initial-dialog">
+            "她好像进了树洞？！我得赶紧抓住她。"
+            <div class="hint-text">点击任意位置继续</div>
+        </div>
+
+        <div id="loading-overlay">
+            <span id="loading-status">正在加载资源...</span>
+            <span id="loading-detail"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // ================= 配置（你可在这里修改数值） =================
+    const CONFIG = {
+        canvasWidth: 800,
+        canvasHeight: 600,
+        cameraWidth: 1915,          // 摄像机视口宽度
+        cameraHeight: 1077,         // 摄像机视口高度
+        charWidth: 96,              // 角色屏幕宽度（像素）
+        charHeight: 128,            // 角色屏幕高度
+        stepSize: 48,               // 移动速度（世界坐标单位）
+        toastDuration: 2000,
+        blockedMessageCooldown: 1500,
+        moveAnimDuration: 350,      // 移动图片切换持续时间
+        repeatInterval: 220,
+        repeatInitialDelay: 400,
+        colorTolerance: 8,
+
+        // 图片路径
+        sceneImage: 'forest_scene.png',
+        collisionImage: 'forest_collision.png',
+        gifUp: 'normal_up.gif',
+        gifDown: 'normal_down.gif',
+        gifLeft: 'normal_left.gif',
+        gifRight: 'normal_right.gif',
+        idleUp: 'normal_idle_back.png',
+        idleDown: 'normal_idle_front.png',
+        idleLeft: 'normal_idle_left.png',
+        idleRight: 'normal_idle_right.png',
+
+        // 文字
+        initialDialogText: '"她好像进了树洞？！我得赶紧抓住她。"',
+        pursuitAlertText: '进入追击剧情……（此处将替换为真实故事）',
+        pursuitButtonText: '继续追击',
+        lookAroundButtonText: '四处看看',
+        purpleBlockedText: '进去可能有危险，还是远离吧',
+        yellowBlockedTexts: ['猜猜我有没有毒', '别、别靠近我...'],
+
+        // 碰撞颜色
+        colorRed: { r:255,g:0,b:0 },
+        colorYellow: { r:255,g:255,b:0 },
+        colorPurple: { r:255,g:0,b:255 },
+        colorWhite: { r:255,g:255,b:255 },
+        colorBlack: { r:0,g:0,b:0 }
+    };
+
+    // DOM 元素
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = false;     // 关闭平滑，保持锐利
+
+    const btnUp = document.getElementById('btn-up');
+    const btnDown = document.getElementById('btn-down');
+    const btnLeft = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
+    const allBtns = [btnUp, btnDown, btnLeft, btnRight];
+    const dialogOptions = document.getElementById('dialog-options');
+    const btnPursuit = document.getElementById('btn-pursuit');
+    const btnLookaround = document.getElementById('btn-lookaround');
+    const toastMsg = document.getElementById('toast-message');
+    const initDialog = document.getElementById('initial-dialog');
+    const loadingOverlay = document.getElementById('loading-overlay');
+    const loadingStatus = document.getElementById('loading-status');
+    const loadingDetail = document.getElementById('loading-detail');
+    const gameContainer = document.getElementById('game-container');
+
+    // 游戏状态
+    const state = {
+        worldWidth: 800,
+        worldHeight: 600,
+        cameraX: 0, cameraY: 0,
+        charX: 400, charY: 300,
+        facing: 'down',
+        isMoving: false,
+        moveTimerId: null,
+        animOffsetY: 0,            // 抖动偏移量
+        animTimerId: null,
+        controlsEnabled: false,
+        initialDialogDismissed: false,
+        inRedZone: false,
+        redDialogDismissed: false,
+        pursuitTriggered: false,
+        lastBlockedMsgTime: 0,
+        toastTimerId: null,
+        repeatTimers: {},
+        repeatInitTimers: {}
+    };
+
+    // 图片存储
+    const images = {};
+    const imagePathMap = {
+        scene: CONFIG.sceneImage,
+        collision: CONFIG.collisionImage,
+        gifUp: CONFIG.gifUp, gifDown: CONFIG.gifDown,
+        gifLeft: CONFIG.gifLeft, gifRight: CONFIG.gifRight,
+        idleUp: CONFIG.idleUp, idleDown: CONFIG.idleDown,
+        idleLeft: CONFIG.idleLeft, idleRight: CONFIG.idleRight
+    };
+
+    // 后备色块
+    function createFallback(color, w, h, label) {
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const cx = c.getContext('2d');
+        cx.fillStyle = color;
+        cx.fillRect(0,0,w,h);
+        cx.strokeStyle = 'rgba(255,255,255,0.6)';
+        cx.lineWidth = 2;
+        cx.strokeRect(1,1,w-2,h-2);
+        cx.fillStyle = '#fff';
+        cx.font = 'bold 11px "PingFang SC","Microsoft YaHei"';
+        cx.textAlign = 'center';
+        cx.fillText(label || '缺失', w/2, h/2+4);
+        return c.toDataURL();
+    }
+
+    function loadImage(key, path, fbW=64, fbH=64) {
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => {
+                images[key] = img;
+                console.log(`✅ ${path}`);
+                resolve({key, success: true});
+            };
+            img.onerror = () => {
+                console.warn(`❌ ${path}`);
+                const fbUrl = createFallback(
+                    key==='scene'?'#3a5a3a': key==='collision'?'#888':'#666',
+                    fbW, fbH, key
+                );
+                const fb = new Image();
+                fb.onload = () => { images[key] = fb; resolve({key, success: false}); };
+                fb.src = fbUrl;
+            };
+            img.src = path;
+        });
+    }
+
+    async function preloadAll() {
+        const failed = [];
+        for (const [key, path] of Object.entries(imagePathMap)) {
+            let w=64, h=64;
+            if (key==='scene' || key==='collision') { w=800; h=600; }
+            const res = await loadImage(key, path, w, h);
+            if (!res.success) failed.push(path);
+        }
+        return failed;
+    }
+
+    // 碰撞系统
+    let collisionPixelData = null;
+
+    function initCollision() {
+        const img = images['collision'];
+        if (!img) return false;
+        state.worldWidth = img.naturalWidth;
+        state.worldHeight = img.naturalHeight;
+        const off = document.createElement('canvas');
+        off.width = state.worldWidth;
+        off.height = state.worldHeight;
+        const offCtx = off.getContext('2d');
+        offCtx.drawImage(img, 0, 0);
+        collisionPixelData = offCtx.getImageData(0, 0, state.worldWidth, state.worldHeight).data;
+        console.log(`🌍 世界尺寸: ${state.worldWidth}×${state.worldHeight}`);
+        return true;
+    }
+
+    function getPixel(x, y) {
+        if (!collisionPixelData) return null;
+        const ix = Math.floor(x), iy = Math.floor(y);
+        if (ix<0 || ix>=state.worldWidth || iy<0 || iy>=state.worldHeight) return null;
+        const idx = (iy * state.worldWidth + ix) * 4;
+        return { r:collisionPixelData[idx], g:collisionPixelData[idx+1], b:collisionPixelData[idx+2] };
+    }
+
+    function matches(c, target, tol=CONFIG.colorTolerance) {
+        if (!c) return false;
+        return Math.abs(c.r-target.r)<=tol && Math.abs(c.g-target.g)<=tol && Math.abs(c.b-target.b)<=tol;
+    }
+
+    function zoneType(x, y) {
+        const c = getPixel(x, y);
+        if (!c) return 'out';
+        if (matches(c, CONFIG.colorBlack)) return 'black';
+        if (matches(c, CONFIG.colorWhite)) return 'white';
+        if (matches(c, CONFIG.colorRed)) return 'red';
+        if (matches(c, CONFIG.colorYellow)) return 'yellow';
+        if (matches(c, CONFIG.colorPurple)) return 'purple';
+        return 'other';
+    }
+
+    function isWalkable(x, y) {
+        const type = zoneType(x, y);
+        return type==='black' || type==='red' || type==='other';
+    }
+
+    // 摄像机
+    function updateCamera() {
+        const halfW = CONFIG.cameraWidth / 2;
+        const halfH = CONFIG.cameraHeight / 2;
+        let targetX = state.charX - halfW;
+        let targetY = state.charY - halfH;
+        targetX = Math.max(0, Math.min(targetX, state.worldWidth - CONFIG.cameraWidth));
+        targetY = Math.max(0, Math.min(targetY, state.worldHeight - CONFIG.cameraHeight));
+        state.cameraX = targetX;
+        state.cameraY = targetY;
+    }
+
+    // 绘制场景
+    function drawScene() {
+        const img = images['scene'];
+        if (!img) {
+            ctx.fillStyle = '#2a4a2a';
+            ctx.fillRect(0,0,CONFIG.canvasWidth, CONFIG.canvasHeight);
+            return;
+        }
+        ctx.drawImage(img,
+            state.cameraX, state.cameraY, CONFIG.cameraWidth, CONFIG.cameraHeight,
+            0, 0, CONFIG.canvasWidth, CONFIG.canvasHeight
+        );
+    }
+
+    // 角色图片（强制切换移动图）
+    function getCharImg() {
+        if (state.isMoving) {
+            switch(state.facing) {
+                case 'up': return images['gifUp'];
+                case 'down': return images['gifDown'];
+                case 'left': return images['gifLeft'];
+                case 'right': return images['gifRight'];
+            }
+        } else {
+            switch(state.facing) {
+                case 'up': return images['idleUp'];
+                case 'down': return images['idleDown'];
+                case 'left': return images['idleLeft'];
+                case 'right': return images['idleRight'];
+            }
+        }
+        return images['idleDown'];
+    }
+
+    function worldToScreen(worldX, worldY) {
+        const scaleX = CONFIG.canvasWidth / CONFIG.cameraWidth;
+        const scaleY = CONFIG.canvasHeight / CONFIG.cameraHeight;
+        return {
+            x: (worldX - state.cameraX) * scaleX,
+            y: (worldY - state.cameraY) * scaleY
+        };
+    }
+
+    function drawCharacter() {
+        const img = getCharImg();
+        if (!img) return;
+        const foot = worldToScreen(state.charX, state.charY);
+        const drawX = foot.x - CONFIG.charWidth / 2;
+        const drawY = foot.y - CONFIG.charHeight + state.animOffsetY;
+        ctx.drawImage(img, drawX, drawY, CONFIG.charWidth, CONFIG.charHeight);
+    }
+
+    // 强化抖动动画（所有方向移动时都抖动，幅度 -4 像素）
+    function startJitterAnim() {
+        if (state.animTimerId) clearInterval(state.animTimerId);
+        let toggle = 0;
+        state.animOffsetY = 0;
+        state.animTimerId = setInterval(() => {
+            toggle = (toggle + 1) % 2;
+            state.animOffsetY = toggle === 0 ? 0 : -4;  // 明显跳动
+        }, 100);
+    }
+
+    function stopJitterAnim() {
+        if (state.animTimerId) {
+            clearInterval(state.animTimerId);
+            state.animTimerId = null;
+        }
+        state.animOffsetY = 0;
+    }
+
+    // 提示消息
+    function showToast(text) {
+        if (state.toastTimerId) clearTimeout(state.toastTimerId);
+        toastMsg.textContent = text;
+        toastMsg.classList.add('show');
+        state.toastTimerId = setTimeout(() => {
+            toastMsg.classList.remove('show');
+            state.toastTimerId = null;
+        }, CONFIG.toastDuration);
+    }
+
+    function showBlockedMsg(type) {
+        const now = Date.now();
+        if (now - state.lastBlockedMsgTime < CONFIG.blockedMessageCooldown) return;
+        state.lastBlockedMsgTime = now;
+        if (type === 'purple') showToast(CONFIG.purpleBlockedText);
+        else if (type === 'yellow') {
+            const texts = CONFIG.yellowBlockedTexts;
+            showToast(texts[Math.floor(Math.random()*texts.length)]);
+        }
+    }
+
+    // 移动逻辑
+    function attemptMove(dir) {
+        if (!state.controlsEnabled || state.pursuitTriggered) return;
+        let nx = state.charX, ny = state.charY;
+        switch(dir) {
+            case 'up': ny -= CONFIG.stepSize; break;
+            case 'down': ny += CONFIG.stepSize; break;
+            case 'left': nx -= CONFIG.stepSize; break;
+            case 'right': nx += CONFIG.stepSize; break;
+        }
+        // 边界限制
+        nx = Math.max(CONFIG.charWidth/2, Math.min(state.worldWidth - CONFIG.charWidth/2, nx));
+        ny = Math.max(CONFIG.charHeight, Math.min(state.worldHeight - 2, ny));
+
+        state.facing = dir;
+        startMoveAnim();   // 这里会设置 isMoving = true 并启动抖动
+
+        const type = zoneType(nx, ny);
+        if (isWalkable(nx, ny)) {
+            state.charX = nx;
+            state.charY = ny;
+            updateCamera();
+            checkRedZone();
+        } else {
+            // 不可通行，显示提示
+            if (type==='purple' || type==='yellow') showBlockedMsg(type);
+        }
+    }
+
+    function startMoveAnim() {
+        state.isMoving = true;
+        startJitterAnim();
+        if (state.moveTimerId) clearTimeout(state.moveTimerId);
+        state.moveTimerId = setTimeout(() => {
+            state.isMoving = false;
+            stopJitterAnim();
+            state.moveTimerId = null;
+        }, CONFIG.moveAnimDuration);
+    }
+
+    function checkRedZone() {
+        const type = zoneType(state.charX, state.charY);
+        if (type === 'red') {
+            if (!state.inRedZone) {
+                state.inRedZone = true;
+                state.redDialogDismissed = false;
+            }
+            if (!state.pursuitTriggered && !state.redDialogDismissed) {
+                dialogOptions.classList.add('visible');
+            }
+        } else {
+            if (state.inRedZone) {
+                state.inRedZone = false;
+                state.redDialogDismissed = false;
+            }
+            dialogOptions.classList.remove('visible');
+        }
+    }
+
+    // 方向键映射
+    function dirFromBtn(btn) {
+        if (btn===btnUp) return 'up';
+        if (btn===btnDown) return 'down';
+        if (btn===btnLeft) return 'left';
+        if (btn===btnRight) return 'right';
+        return null;
+    }
+
+    // 长按支持
+    function startRepeat(dir) {
+        stopRepeat(dir);
+        state.repeatInitTimers[dir] = setTimeout(() => {
+            attemptMove(dir);
+            state.repeatTimers[dir] = setInterval(() => attemptMove(dir), CONFIG.repeatInterval);
+        }, CONFIG.repeatInitialDelay);
+    }
+
+    function stopRepeat(dir) {
+        if (state.repeatInitTimers[dir]) { clearTimeout(state.repeatInitTimers[dir]); state.repeatInitTimers[dir]=null; }
+        if (state.repeatTimers[dir]) { clearInterval(state.repeatTimers[dir]); state.repeatTimers[dir]=null; }
+    }
+
+    function stopAll() { ['up','down','left','right'].forEach(stopRepeat); }
+
+    function bindDpad(btn) {
+        const dir = dirFromBtn(btn);
+        if (!dir) return;
+        btn.addEventListener('touchstart', e => {
+            e.preventDefault();
+            btn.classList.add('pressed');
+            attemptMove(dir);
+            startRepeat(dir);
+        }, {passive:false});
+        btn.addEventListener('touchend', e => {
+            e.preventDefault();
+            btn.classList.remove('pressed');
+            stopRepeat(dir);
+        });
+        btn.addEventListener('touchcancel', () => { btn.classList.remove('pressed'); stopRepeat(dir); });
+        btn.addEventListener('mousedown', e => {
+            e.preventDefault();
+            btn.classList.add('pressed');
+            attemptMove(dir);
+            startRepeat(dir);
+        });
+        btn.addEventListener('mouseup', e => { e.preventDefault(); btn.classList.remove('pressed'); stopRepeat(dir); });
+        btn.addEventListener('mouseleave', () => { btn.classList.remove('pressed'); stopRepeat(dir); });
+    }
+
+    function dismissInit() {
+        if (state.initialDialogDismissed) return;
+        state.initialDialogDismissed = true;
+        state.controlsEnabled = true;
+        initDialog.classList.add('hidden');
+    }
+
+    // 游戏循环
+    function gameLoop() {
+        ctx.clearRect(0,0,CONFIG.canvasWidth, CONFIG.canvasHeight);
+        drawScene();
+        drawCharacter();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function resizeGame() {
+        const scale = Math.min(
+            window.innerWidth / CONFIG.canvasWidth,
+            window.innerHeight / CONFIG.canvasHeight,
+            1.2
+        );
+        gameContainer.style.transform = `scale(${scale})`;
+        gameContainer.style.marginLeft = `${(window.innerWidth - CONFIG.canvasWidth*scale)/2}px`;
+        gameContainer.style.marginTop = `${(window.innerHeight - CONFIG.canvasHeight*scale)/2}px`;
+    }
+
+    function findStart() {
+        const cx = Math.floor(state.worldWidth/2);
+        const cy = Math.floor(state.worldHeight/2);
+        if (isWalkable(cx, cy)) { state.charX=cx; state.charY=cy; return; }
+        for (let r=1; r<Math.max(state.worldWidth,state.worldHeight); r+=CONFIG.stepSize) {
+            for (let a=0; a<360; a+=20) {
+                const rad = a*Math.PI/180;
+                const tx = Math.round(cx + r*Math.cos(rad));
+                const ty = Math.round(cy + r*Math.sin(rad));
+                if (tx>=0 && tx<state.worldWidth && ty>=0 && ty<state.worldHeight && isWalkable(tx,ty)) {
+                    state.charX=tx; state.charY=ty; return;
+                }
+            }
+        }
+        state.charX=cx; state.charY=cy;
+    }
+
+    // 启动
+    async function init() {
+        console.log('🎮 初始化...');
+        loadingOverlay.classList.remove('done');
+        loadingStatus.textContent = '加载资源中...';
+        const failed = await preloadAll();
+        if (failed.length) {
+            loadingStatus.textContent = `⚠️ ${failed.length} 个文件失败`;
+            loadingDetail.textContent = failed.join(', ');
+        } else {
+            loadingStatus.textContent = '✅ 资源加载完成';
+        }
+
+        if (!initCollision()) {
+            loadingDetail.textContent += '\n碰撞图缺失！';
+        }
+        if (images['scene'] && images['scene'].naturalWidth) {
+            state.worldWidth = images['scene'].naturalWidth;
+            state.worldHeight = images['scene'].naturalHeight;
+        }
+        console.log(`📷 视口: ${CONFIG.cameraWidth}×${CONFIG.cameraHeight}`);
+        console.log(`👤 角色尺寸: ${CONFIG.charWidth}×${CONFIG.charHeight}`);
+
+        findStart();
+        updateCamera();
+        allBtns.forEach(bindDpad);
+
+        btnPursuit.addEventListener('click', e => {
+            e.stopPropagation();
+            if (!state.inRedZone || state.pursuitTriggered) return;
+            alert(CONFIG.pursuitAlertText);
+            state.pursuitTriggered = true;
+            state.controlsEnabled = false;
+            dialogOptions.classList.remove('visible');
+        });
+        btnLookaround.addEventListener('click', e => {
+            e.stopPropagation();
+            if (!state.inRedZone || state.pursuitTriggered) return;
+            state.redDialogDismissed = true;
+            dialogOptions.classList.remove('visible');
+        });
+
+        initDialog.addEventListener('click', e => { e.stopPropagation(); dismissInit(); });
+        canvas.addEventListener('click', e => { if (e.target===canvas) dismissInit(); });
+
+        gameContainer.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
+        window.addEventListener('resize', resizeGame);
+        window.addEventListener('orientationchange', () => setTimeout(resizeGame,100));
+        resizeGame();
+
+        loadingOverlay.classList.add('done');
+        setTimeout(() => { loadingOverlay.style.display='none'; }, 600);
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    // 全局清理
+    document.addEventListener('touchend', () => { stopAll(); allBtns.forEach(b=>b.classList.remove('pressed')); });
+    document.addEventListener('touchcancel', () => { stopAll(); allBtns.forEach(b=>b.classList.remove('pressed')); });
+    document.addEventListener('mouseup', () => { stopAll(); allBtns.forEach(b=>b.classList.remove('pressed')); });
+
+    init().catch(err => {
+        console.error('💥 启动失败:', err);
+        loadingStatus.textContent = '游戏加载失败，请刷新';
+    });
+})();
+</script>
+</body>
+</html>
