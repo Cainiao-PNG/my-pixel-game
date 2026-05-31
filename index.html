@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>森林奇遇 - 青色出生点</title>
+    <title>森林奇遇</title>
     <style>
         :root {
             --canvas-width: 800;
@@ -239,23 +239,23 @@
 
 <script>
 (function() {
-    // ================= 配置 =================
+    // ================= 可修改的配置 =================
     const CONFIG = {
         canvasWidth: 800,
         canvasHeight: 600,
-        cameraWidth: 1915,
-        cameraHeight: 1077,
-        charWidth: 96,
-        charHeight: 128,
-        stepSize: 48,
+        cameraWidth: 1915,          // 摄像机视口宽度（世界坐标）
+        cameraHeight: 1077,         // 摄像机视口高度
+        charWidth: 96,              // 角色屏幕宽度（像素）
+        charHeight: 128,            // 角色屏幕高度
+        stepSize: 48,               // 移动速度（世界单位）
         toastDuration: 2000,
         blockedMessageCooldown: 1500,
-        moveAnimDuration: 350,
+        moveAnimDuration: 350,      // 移动动画持续时间
         repeatInterval: 220,
         repeatInitialDelay: 400,
         colorTolerance: 8,
 
-        // 图片路径
+        // ---- 图片路径（请根据实际文件名修改） ----
         sceneImage: 'forest_scene.png',
         collisionImage: 'forest_collision.png',
         gifUp: 'normal_up.gif',
@@ -267,7 +267,7 @@
         idleLeft: 'normal_idle_left.png',
         idleRight: 'normal_idle_right.png',
 
-        // 文字
+        // ---- 文字内容 ----
         initialDialogText: '"她好像进了树洞？！我得赶紧抓住她。"',
         pursuitAlertText: '进入追击剧情……（此处将替换为真实故事）',
         pursuitButtonText: '继续追击',
@@ -275,19 +275,19 @@
         purpleBlockedText: '进去可能有危险，还是远离吧',
         yellowBlockedTexts: ['猜猜我有没有毒', '别、别靠近我...'],
 
-        // 碰撞颜色定义
-        colorRed:    { r:255, g:0,   b:0 },     // 红色：可行走，触发对话选项
-        colorYellow: { r:255, g:255, b:0 },     // 黄色：不可行走，触发随机提示
-        colorPurple: { r:255, g:0,   b:255 },   // 紫色：不可行走，触发提示
-        colorWhite:  { r:255, g:255, b:255 },   // 白色：障碍物
-        colorBlack:  { r:0,   g:0,   b:0 },     // 黑色：可通行
-        colorCyan:   { r:0,   g:255, b:255 },   // 青色：角色出生点（新增）
+        // ---- 碰撞颜色定义 ----
+        colorRed:    { r:255, g:0,   b:0 },
+        colorYellow: { r:255, g:255, b:0 },
+        colorPurple: { r:255, g:0,   b:255 },
+        colorWhite:  { r:255, g:255, b:255 },
+        colorBlack:  { r:0,   g:0,   b:0 },
+        colorCyan:   { r:0,   g:255, b:255 }   // 青色：出生点
     };
 
-    // DOM
+    // DOM 元素
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
-    ctx.imageSmoothingEnabled = false;
+    ctx.imageSmoothingEnabled = false; // 保持像素锐利
 
     const btnUp = document.getElementById('btn-up');
     const btnDown = document.getElementById('btn-down');
@@ -304,6 +304,7 @@
     const loadingDetail = document.getElementById('loading-detail');
     const gameContainer = document.getElementById('game-container');
 
+    // 游戏状态
     const state = {
         worldWidth: 800,
         worldHeight: 600,
@@ -325,6 +326,7 @@
         repeatInitTimers: {}
     };
 
+    // 图片存储
     const images = {};
     const imagePathMap = {
         scene: CONFIG.sceneImage,
@@ -335,6 +337,7 @@
         idleLeft: CONFIG.idleLeft, idleRight: CONFIG.idleRight
     };
 
+    // 后备色块
     function createFallback(color, w, h, label) {
         const c = document.createElement('canvas');
         c.width = w; c.height = h;
@@ -419,13 +422,12 @@
         if (matches(c, CONFIG.colorRed))    return 'red';
         if (matches(c, CONFIG.colorYellow)) return 'yellow';
         if (matches(c, CONFIG.colorPurple)) return 'purple';
-        if (matches(c, CONFIG.colorCyan))   return 'cyan';    // 新增青色
+        if (matches(c, CONFIG.colorCyan))   return 'cyan';
         return 'other';
     }
 
     function isWalkable(x, y) {
         const type = zoneType(x, y);
-        // 青色和黑色、红色一样，都是可行走的
         return type==='black' || type==='red' || type==='cyan' || type==='other';
     }
 
@@ -497,7 +499,7 @@
         state.animOffsetY = 0;
         state.animTimerId = setInterval(() => {
             toggle = (toggle + 1) % 2;
-            state.animOffsetY = toggle === 0 ? 0 : -4;
+            state.animOffsetY = toggle === 0 ? 0 : -2;  // 轻微抖动，可根据需要改为 -3 或 -4
         }, 100);
     }
 
@@ -648,12 +650,12 @@
         gameContainer.style.marginTop = `${(window.innerHeight - CONFIG.canvasHeight*scale)/2}px`;
     }
 
-    // ★ 新出生点查找：优先查找青色像素，找不到则回退到中心黑色区域
+    // ★ 优化后的出生点查找（按步长扫描，避免卡顿）
     function findStart() {
-        // 第一优先级：查找碰撞图上的青色像素
+        const scanStep = 8; // 每隔8像素检查一次，大幅提升性能
         if (collisionPixelData) {
-            for (let y = 0; y < state.worldHeight; y++) {
-                for (let x = 0; x < state.worldWidth; x++) {
+            for (let y = 0; y < state.worldHeight; y += scanStep) {
+                for (let x = 0; x < state.worldWidth; x += scanStep) {
                     if (zoneType(x, y) === 'cyan') {
                         state.charX = x;
                         state.charY = y;
@@ -664,11 +666,10 @@
             }
         }
 
-        // 第二优先级：从世界中心螺旋搜索黑色可通行区域
         console.log('🔍 未找到青色出生点，回退到中心搜索');
         const cx = Math.floor(state.worldWidth / 2);
         const cy = Math.floor(state.worldHeight / 2);
-        if (isWalkable(cx, cy)) { state.charX=cx; state.charY=cy; return; }
+        if (isWalkable(cx, cy)) { state.charX = cx; state.charY = cy; return; }
         for (let r = 1; r < Math.max(state.worldWidth, state.worldHeight); r += CONFIG.stepSize) {
             for (let a = 0; a < 360; a += 20) {
                 const rad = a * Math.PI / 180;
@@ -703,9 +704,6 @@
             state.worldWidth = images['scene'].naturalWidth;
             state.worldHeight = images['scene'].naturalHeight;
         }
-
-        console.log(`📷 视口: ${CONFIG.cameraWidth}×${CONFIG.cameraHeight}`);
-        console.log(`👤 角色尺寸: ${CONFIG.charWidth}×${CONFIG.charHeight}`);
 
         findStart();
         updateCamera();
