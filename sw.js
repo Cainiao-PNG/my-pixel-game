@@ -14,21 +14,14 @@ const urlsToCache = [
   './normal_idle_back.png',
   './normal_idle_front.png',
   './normal_idle_left.png',
-  './normal_idle_right.png',
-  './awake_up.gif',
-  './awake_down.gif',
-  './awake_left.gif',
-  './awake_right.gif',
-  './awake_idle_back.png',
-  './awake_idle_front.png',
-  './awake_idle_left.png',
-  './awake_idle_right.png'
+  './normal_idle_right.png'
 ];
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(urlsToCache))
+      .catch(err => console.warn('缓存部分失败，但游戏仍可运行', err))
   );
   self.skipWaiting();
 });
@@ -36,10 +29,7 @@ self.addEventListener('install', event => {
 self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
-      .then(response => {
-        if (response) return response;
-        return fetch(event.request);
-      })
+      .then(response => response || fetch(event.request))
   );
 });
 

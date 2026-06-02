@@ -11,227 +11,61 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
     <style>
-        * {
-            margin: 0; padding: 0;
-            box-sizing: border-box;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
-        }
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+        html,body { width:100%; height:100%; overflow:hidden; position:fixed; top:0; left:0; background:#1a1a2e; touch-action:manipulation; overscroll-behavior:none; font-family:'PingFang SC','Microsoft YaHei',sans-serif; }
+        #game-container { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+        #gameCanvas { display:block; width:100%; height:100%; object-fit:cover; image-rendering:auto; border-radius:0; box-shadow:none; }
 
-        html, body {
-            width: 100%; height: 100%;
-            overflow: hidden;
-            position: fixed;
-            top: 0; left: 0;
-            background: #1a1a2e;
-            touch-action: manipulation;
-            overscroll-behavior: none;
-            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
-        }
+        /* 摇杆 */
+        #joystick-container { position:absolute; left:3%; bottom:12%; width:22%; height:30%; pointer-events:none; z-index:10; }
+        #joystick-base { position:absolute; width:100%; height:100%; border-radius:50%; background:rgba(255,255,255,0.2); border:2px solid rgba(255,255,255,0.5); pointer-events:auto; touch-action:none; }
+        #joystick-thumb { position:absolute; width:40%; height:40%; border-radius:50%; background:rgba(255,255,255,0.6); border:2px solid rgba(255,255,255,0.9); top:30%; left:30%; pointer-events:none; transition:background 0.1s; }
 
-        #game-container {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
+        /* 红色区域对话（按钮缩小，间隙减小） */
+        #dialog-options { position:absolute; right:5%; top:50%; transform:translateY(-50%); display:flex; flex-direction:column; gap:1.5vh; z-index:20; pointer-events:none; opacity:0; transition:opacity 0.3s; }
+        #dialog-options.visible { opacity:1; pointer-events:auto; }
+        .dialog-btn { padding:1.2vh 3.5vw; border-radius:4vw; background:rgba(20,20,40,0.8); border:1.5px solid rgba(255,255,255,0.6); color:#fff; font-size:2.8vw; font-weight:600; cursor:pointer; white-space:nowrap; transition:background 0.2s,transform 0.15s; backdrop-filter:blur(8px); text-shadow:0 1px 3px rgba(0,0,0,0.7); outline:none; -webkit-tap-highlight-color:transparent; touch-action:manipulation; min-width:25vw; text-align:center; }
+        .dialog-btn:active { background:rgba(255,255,255,0.3); transform:scale(0.94); }
+        #btn-pursuit { border-color:rgba(255,180,100,0.8); background:rgba(180,60,30,0.6); }
+        #btn-lookaround { border-color:rgba(150,200,255,0.7); background:rgba(30,60,120,0.55); }
 
-        #gameCanvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            image-rendering: auto;
-            border-radius: 0;
-            box-shadow: none;
-        }
+        /* 顶部提示消息（字体和高度减小） */
+        #toast-message { position:absolute; top:5%; left:50%; transform:translateX(-50%); padding:1vh 4vw; border-radius:4vw; background:rgba(0,0,0,0.8); color:#fff; font-size:2.5vw; white-space:nowrap; z-index:30; pointer-events:none; opacity:0; transition:opacity 0.4s; backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,0.3); }
+        #toast-message.show { opacity:1; }
 
-        /* ---------- 虚拟摇杆 ---------- */
-        #joystick-container {
-            position: absolute;
-            left: 3%;
-            bottom: 12%;
-            width: 22%;
-            height: 30%;
-            pointer-events: none;
-            z-index: 10;
-        }
-
-        #joystick-base {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.2);
-            border: 2px solid rgba(255,255,255,0.5);
-            pointer-events: auto;
-            touch-action: none;
-        }
-
-        #joystick-thumb {
-            position: absolute;
-            width: 40%;
-            height: 40%;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.6);
-            border: 2px solid rgba(255,255,255,0.9);
-            top: 30%;
-            left: 30%;
-            pointer-events: none;
-            transition: background 0.1s;
-        }
-
-        /* ---------- 红色区域对话框 ---------- */
-        #dialog-options {
-            position: absolute;
-            right: 5%;
-            top: 50%;
-            transform: translateY(-50%);
-            display: flex;
-            flex-direction: column;
-            gap: 2vh;
-            z-index: 20;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-        #dialog-options.visible { opacity: 1; pointer-events: auto; }
-
-        .dialog-btn {
-            padding: 2vh 4vw;
-            border-radius: 5vw;
-            background: rgba(20,20,40,0.8);
-            border: 1.5px solid rgba(255,255,255,0.6);
-            color: #fff;
-            font-size: 3.5vw;
-            font-weight: 600;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: background 0.2s, transform 0.15s;
-            backdrop-filter: blur(8px);
-            text-shadow: 0 1px 3px rgba(0,0,0,0.7);
-            outline: none;
-            -webkit-tap-highlight-color: transparent;
-            touch-action: manipulation;
-            min-width: 30vw;
-            text-align: center;
-        }
-        .dialog-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.94); }
-
-        #btn-pursuit    { border-color: rgba(255,180,100,0.8); background: rgba(180,60,30,0.6); }
-        #btn-lookaround { border-color: rgba(150,200,255,0.7); background: rgba(30,60,120,0.55); }
-
-        /* 提示消息 */
-        #toast-message {
-            position: absolute;
-            top: 5%;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 1.5vh 5vw;
-            border-radius: 5vw;
-            background: rgba(0,0,0,0.8);
-            color: #fff;
-            font-size: 3.5vw;
-            white-space: nowrap;
-            z-index: 30;
-            pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.4s;
-            backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.3);
-        }
-        #toast-message.show { opacity: 1; }
-
-        /* 初始对话 */
-        #initial-dialog {
-            position: absolute;
-            bottom: 8%;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 80%;
-            max-width: 500px;
-            padding: 2vh 5vw;
-            border-radius: 4vw;
-            background: rgba(10,10,25,0.9);
-            border: 2px solid rgba(255,255,255,0.5);
-            color: #fff;
-            font-size: 3.8vw;
-            text-align: center;
-            z-index: 40;
-            cursor: pointer;
-            letter-spacing: 0.5px;
-            line-height: 1.5;
-            transition: opacity 0.3s;
-            backdrop-filter: blur(6px);
-            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
-        }
-        #initial-dialog.hidden {
-            opacity: 0; pointer-events: none;
-            transform: translateX(-50%) translateY(20px);
-        }
-        #initial-dialog .hint-text {
-            font-size: 2.5vw;
-            opacity: 0.7;
-            margin-top: 1vh;
-        }
+        /* 初始对话（减小字体、缩小高度） */
+        #initial-dialog { position:absolute; bottom:8%; left:50%; transform:translateX(-50%); width:80%; max-width:500px; padding:1.5vh 5vw; border-radius:3vw; background:rgba(10,10,25,0.9); border:2px solid rgba(255,255,255,0.5); color:#fff; font-size:2.8vw; text-align:center; z-index:40; cursor:pointer; letter-spacing:0.5px; line-height:1.4; transition:opacity 0.3s; backdrop-filter:blur(6px); text-shadow:0 1px 3px rgba(0,0,0,0.8); }
+        #initial-dialog.hidden { opacity:0; pointer-events:none; transform:translateX(-50%) translateY(20px); }
+        #initial-dialog .hint-text { font-size:2vw; opacity:0.7; margin-top:0.8vh; }
 
         /* 加载遮罩 */
-        #loading-overlay {
-            position: absolute;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            z-index: 50;
-            pointer-events: none;
-            color: #fff;
-            font-size: 4vw;
-            background: rgba(0,0,0,0.8);
-            transition: opacity 0.5s;
-            gap: 2vh;
-        }
-        #loading-overlay.done { opacity: 0; }
-        #loading-detail {
-            font-size: 3vw;
-            opacity: 0.8;
-            max-width: 80%;
-            text-align: center;
-            line-height: 1.5;
-        }
+        #loading-overlay { position:absolute; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:50; pointer-events:none; color:#fff; font-size:3.5vw; background:rgba(0,0,0,0.8); transition:opacity 0.5s; gap:2vh; }
+        #loading-overlay.done { opacity:0; }
+        #loading-detail { font-size:2.5vw; opacity:0.8; max-width:80%; text-align:center; line-height:1.5; }
     </style>
 </head>
 <body>
 <div id="game-container">
     <canvas id="gameCanvas" width="800" height="600"></canvas>
 
-    <!-- 虚拟摇杆 -->
     <div id="joystick-container">
         <div id="joystick-base">
             <div id="joystick-thumb"></div>
         </div>
     </div>
 
-    <!-- 红色区域对话 -->
     <div id="dialog-options">
         <button class="dialog-btn" id="btn-pursuit">继续追击</button>
         <button class="dialog-btn" id="btn-lookaround">四处看看</button>
     </div>
 
-    <!-- 提示消息 -->
     <div id="toast-message"></div>
 
-    <!-- 初始对话 -->
     <div id="initial-dialog">
         "她好像进了树洞？！我得赶紧抓住她。"
         <div class="hint-text">点击任意位置继续</div>
     </div>
 
-    <!-- 加载遮罩 -->
     <div id="loading-overlay">
         <span id="loading-status">正在加载资源...</span>
         <span id="loading-detail"></span>
@@ -240,21 +74,16 @@
 
 <script>
 (function() {
-    // ================= 配置 =================
     const CONFIG = {
-        canvasWidth: 800,
-        canvasHeight: 600,
-        cameraWidth: 1915,
-        cameraHeight: 1077,
-        charWidth: 96,
-        charHeight: 128,
-        moveSpeed: 160,              // 每秒移动像素（世界单位）
+        canvasWidth: 800, canvasHeight: 600,
+        cameraWidth: 1915, cameraHeight: 1077,
+        charWidth: 96, charHeight: 128,
+        moveSpeed: 160,        // 每秒移动像素（世界单位）
         toastDuration: 2000,
         blockedMessageCooldown: 1500,
         moveAnimDuration: 350,
         colorTolerance: 8,
 
-        // 图片路径
         sceneImage: 'forest_scene.png',
         collisionImage: 'forest_collision.png',
         gifUp: 'normal_up.gif',
@@ -266,7 +95,6 @@
         idleLeft: 'normal_idle_left.png',
         idleRight: 'normal_idle_right.png',
 
-        // 文字
         initialDialogText: '"她好像进了树洞？！我得赶紧抓住她。"',
         pursuitAlertText: '进入追击剧情……（此处将替换为真实故事）',
         pursuitButtonText: '继续追击',
@@ -274,7 +102,6 @@
         purpleBlockedText: '进去可能有危险，还是远离吧',
         yellowBlockedTexts: ['猜猜我有没有毒', '别、别靠近我...'],
 
-        // 碰撞颜色
         colorRed:    { r:255, g:0,   b:0 },
         colorYellow: { r:255, g:255, b:0 },
         colorPurple: { r:255, g:0,   b:255 },
@@ -283,7 +110,6 @@
         colorCyan:   { r:0,   g:255, b:255 }
     };
 
-    // DOM
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     ctx.imageSmoothingEnabled = false;
@@ -300,36 +126,21 @@
     const loadingDetail = document.getElementById('loading-detail');
     const gameContainer = document.getElementById('game-container');
 
-    // 状态
     const state = {
-        worldWidth: 800,
-        worldHeight: 600,
+        worldWidth: 800, worldHeight: 600,
         cameraX: 0, cameraY: 0,
         charX: 400, charY: 300,
         facing: 'down',
         isMoving: false,
         moveTimerId: null,
-        animOffsetY: 0,
-        animTimerId: null,
+        animOffsetY: 0, animTimerId: null,
         controlsEnabled: false,
         initialDialogDismissed: false,
-        inRedZone: false,
-        redDialogDismissed: false,
-        pursuitTriggered: false,
-        lastBlockedMsgTime: 0,
-        toastTimerId: null,
-
-        // 摇杆状态
-        joystick: {
-            active: false,
-            baseX: 0, baseY: 0,   // 摇杆中心坐标（相对于base）
-            dx: 0, dy: 0,         // 偏移量
-            distance: 0,
-            angle: 0
-        }
+        inRedZone: false, redDialogDismissed: false, pursuitTriggered: false,
+        lastBlockedMsgTime: 0, toastTimerId: null,
+        joystick: { active:false, baseX:0, baseY:0, dx:0, dy:0, distance:0, angle:0 }
     };
 
-    // 图片存储（同之前）
     const images = {};
     const imagePathMap = {
         scene: CONFIG.sceneImage,
@@ -340,127 +151,233 @@
         idleLeft: CONFIG.idleLeft, idleRight: CONFIG.idleRight
     };
 
-    function createFallback(color, w, h, label) { /* ... 同之前 ... */ }
-    function loadImage(key, path, fbW=64, fbH=64) { /* ... 同之前 ... */ }
-    async function preloadAll() { /* ... 同之前 ... */ }
+    function createFallback(color, w, h, label) {
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const cx = c.getContext('2d');
+        cx.fillStyle = color;
+        cx.fillRect(0,0,w,h);
+        cx.strokeStyle = 'rgba(255,255,255,0.6)';
+        cx.lineWidth = 2;
+        cx.strokeRect(1,1,w-2,h-2);
+        cx.fillStyle = '#fff';
+        cx.font = 'bold 11px "PingFang SC","Microsoft YaHei"';
+        cx.textAlign = 'center';
+        cx.fillText(label || '缺失', w/2, h/2+4);
+        return c.toDataURL();
+    }
 
-    // 碰撞系统（同之前）
-    let collisionPixelData = null;
-    function initCollision() { /* ... */ }
-    function getPixel(x, y) { /* ... */ }
-    function matches(c, target, tol=CONFIG.colorTolerance) { /* ... */ }
-    function zoneType(x, y) { /* ... */ }
-    function isWalkable(x, y) { /* ... */ }
+    function loadImage(key, path, fbW=64, fbH=64) {
+        return new Promise(resolve => {
+            const img = new Image();
+            img.onload = () => { images[key] = img; console.log(`✅ ${path}`); resolve({key, success:true}); };
+            img.onerror = () => {
+                console.warn(`❌ ${path}`);
+                const fbUrl = createFallback(
+                    key==='scene'?'#3a5a3a': key==='collision'?'#888':'#666',
+                    fbW, fbH, key
+                );
+                const fb = new Image();
+                fb.onload = () => { images[key] = fb; resolve({key, success:false}); };
+                fb.src = fbUrl;
+            };
+            img.src = path;
+        });
+    }
 
-    // 摄像机（同之前）
-    function updateCamera() { /* ... */ }
-
-    // 绘制场景（同之前）
-    function drawScene() { /* ... */ }
-
-    // 角色图像（根据移动状态切换）
-    function getCharImg() { /* ... */ }
-
-    // 世界坐标转屏幕坐标
-    function worldToScreen(worldX, worldY) { /* ... */ }
-
-    function drawCharacter() { /* ... */ }
-
-    // 抖动动画
-    function startJitterAnim() { /* ... */ }
-    function stopJitterAnim() { /* ... */ }
-
-    // 提示消息
-    function showToast(text) { /* ... */ }
-    function showBlockedMsg(type) { /* ... */ }
-
-    // 红色区域检查
-    function checkRedZone() { /* ... */ }
-
-    // 摇杆事件绑定
-    function setupJoystick() {
-        const base = joystickBase;
-        const thumb = joystickThumb;
-        let baseRect = null;
-
-        function updateBaseRect() {
-            baseRect = base.getBoundingClientRect();
-            state.joystick.baseX = baseRect.width / 2;
-            state.joystick.baseY = baseRect.height / 2;
+    async function preloadAll() {
+        const failed = [];
+        for (const [key, path] of Object.entries(imagePathMap)) {
+            let w=64, h=64;
+            if (key==='scene' || key==='collision') { w=800; h=600; }
+            const res = await loadImage(key, path, w, h);
+            if (!res.success) failed.push(path);
         }
+        return failed;
+    }
 
+    let collisionPixelData = null;
+    function initCollision() {
+        const img = images['collision'];
+        if (!img) return false;
+        state.worldWidth = img.naturalWidth;
+        state.worldHeight = img.naturalHeight;
+        const off = document.createElement('canvas');
+        off.width = state.worldWidth; off.height = state.worldHeight;
+        const offCtx = off.getContext('2d');
+        offCtx.drawImage(img, 0, 0);
+        collisionPixelData = offCtx.getImageData(0, 0, state.worldWidth, state.worldHeight).data;
+        return true;
+    }
+    function getPixel(x, y) {
+        if (!collisionPixelData) return null;
+        const ix = Math.floor(x), iy = Math.floor(y);
+        if (ix<0 || ix>=state.worldWidth || iy<0 || iy>=state.worldHeight) return null;
+        const idx = (iy*state.worldWidth + ix)*4;
+        return { r:collisionPixelData[idx], g:collisionPixelData[idx+1], b:collisionPixelData[idx+2] };
+    }
+    function matches(c, target, tol=CONFIG.colorTolerance) {
+        if (!c) return false;
+        return Math.abs(c.r-target.r)<=tol && Math.abs(c.g-target.g)<=tol && Math.abs(c.b-target.b)<=tol;
+    }
+    function zoneType(x, y) {
+        const c = getPixel(x, y);
+        if (!c) return 'out';
+        if (matches(c, CONFIG.colorBlack))  return 'black';
+        if (matches(c, CONFIG.colorWhite))  return 'white';
+        if (matches(c, CONFIG.colorRed))    return 'red';
+        if (matches(c, CONFIG.colorYellow)) return 'yellow';
+        if (matches(c, CONFIG.colorPurple)) return 'purple';
+        if (matches(c, CONFIG.colorCyan))   return 'cyan';
+        return 'other';
+    }
+    function isWalkable(x, y) {
+        const type = zoneType(x, y);
+        return type==='black' || type==='red' || type==='cyan' || type==='other';
+    }
+
+    function updateCamera() {
+        const halfW = CONFIG.cameraWidth/2, halfH = CONFIG.cameraHeight/2;
+        let tx = state.charX - halfW, ty = state.charY - halfH;
+        tx = Math.max(0, Math.min(tx, state.worldWidth - CONFIG.cameraWidth));
+        ty = Math.max(0, Math.min(ty, state.worldHeight - CONFIG.cameraHeight));
+        state.cameraX = tx; state.cameraY = ty;
+    }
+
+    function drawScene() {
+        const img = images['scene'];
+        if (!img) { ctx.fillStyle = '#2a4a2a'; ctx.fillRect(0,0,CONFIG.canvasWidth,CONFIG.canvasHeight); return; }
+        ctx.drawImage(img, state.cameraX, state.cameraY, CONFIG.cameraWidth, CONFIG.cameraHeight,
+                      0, 0, CONFIG.canvasWidth, CONFIG.canvasHeight);
+    }
+    function getCharImg() {
+        if (state.isMoving) {
+            switch(state.facing) {
+                case 'up': return images['gifUp'];
+                case 'down': return images['gifDown'];
+                case 'left': return images['gifLeft'];
+                case 'right': return images['gifRight'];
+            }
+        } else {
+            switch(state.facing) {
+                case 'up': return images['idleUp'];
+                case 'down': return images['idleDown'];
+                case 'left': return images['idleLeft'];
+                case 'right': return images['idleRight'];
+            }
+        }
+        return images['idleDown'];
+    }
+    function worldToScreen(wx, wy) {
+        const sx = CONFIG.canvasWidth / CONFIG.cameraWidth;
+        const sy = CONFIG.canvasHeight / CONFIG.cameraHeight;
+        return { x: (wx - state.cameraX)*sx, y: (wy - state.cameraY)*sy };
+    }
+    function drawCharacter() {
+        const img = getCharImg();
+        if (!img) return;
+        const foot = worldToScreen(state.charX, state.charY);
+        const dx = foot.x - CONFIG.charWidth/2;
+        const dy = foot.y - CONFIG.charHeight + state.animOffsetY;
+        ctx.drawImage(img, dx, dy, CONFIG.charWidth, CONFIG.charHeight);
+    }
+
+    function startJitterAnim() {
+        if (state.animTimerId) clearInterval(state.animTimerId);
+        let toggle = 0;
+        state.animOffsetY = 0;
+        state.animTimerId = setInterval(() => {
+            toggle = (toggle+1)%2;
+            state.animOffsetY = toggle===0 ? 0 : -2;
+        }, 100);
+    }
+    function stopJitterAnim() {
+        if (state.animTimerId) { clearInterval(state.animTimerId); state.animTimerId = null; }
+        state.animOffsetY = 0;
+    }
+
+    function showToast(text) {
+        if (state.toastTimerId) clearTimeout(state.toastTimerId);
+        toastMsg.textContent = text;
+        toastMsg.classList.add('show');
+        state.toastTimerId = setTimeout(() => { toastMsg.classList.remove('show'); state.toastTimerId = null; }, CONFIG.toastDuration);
+    }
+    function showBlockedMsg(type) {
+        const now = Date.now();
+        if (now - state.lastBlockedMsgTime < CONFIG.blockedMessageCooldown) return;
+        state.lastBlockedMsgTime = now;
+        if (type==='purple') showToast(CONFIG.purpleBlockedText);
+        else if (type==='yellow') {
+            const t = CONFIG.yellowBlockedTexts;
+            showToast(t[Math.floor(Math.random()*t.length)]);
+        }
+    }
+
+    function checkRedZone() {
+        const type = zoneType(state.charX, state.charY);
+        if (type==='red') {
+            if (!state.inRedZone) { state.inRedZone = true; state.redDialogDismissed = false; }
+            if (!state.pursuitTriggered && !state.redDialogDismissed) dialogOptions.classList.add('visible');
+        } else {
+            if (state.inRedZone) { state.inRedZone = false; state.redDialogDismissed = false; }
+            dialogOptions.classList.remove('visible');
+        }
+    }
+
+    function setupJoystick() {
+        const base = joystickBase, thumb = joystickThumb;
+        let baseRect = null;
+        function updateRect() {
+            baseRect = base.getBoundingClientRect();
+            state.joystick.baseX = baseRect.width/2;
+            state.joystick.baseY = baseRect.height/2;
+        }
         function handleStart(e) {
             e.preventDefault();
-            updateBaseRect();
-            const touch = e.touches ? e.touches[0] : e;
-            const clientX = touch.clientX;
-            const clientY = touch.clientY;
-            const dx = clientX - (baseRect.left + state.joystick.baseX);
-            const dy = clientY - (baseRect.top + state.joystick.baseY);
+            updateRect();
+            const t = e.touches ? e.touches[0] : e;
+            const dx = t.clientX - (baseRect.left + state.joystick.baseX);
+            const dy = t.clientY - (baseRect.top + state.joystick.baseY);
             updateJoystick(dx, dy);
             state.joystick.active = true;
         }
-
         function handleMove(e) {
             e.preventDefault();
             if (!state.joystick.active) return;
-            const touch = e.touches ? e.touches[0] : e;
-            const clientX = touch.clientX;
-            const clientY = touch.clientY;
-            const dx = clientX - (baseRect.left + state.joystick.baseX);
-            const dy = clientY - (baseRect.top + state.joystick.baseY);
+            const t = e.touches ? e.touches[0] : e;
+            const dx = t.clientX - (baseRect.left + state.joystick.baseX);
+            const dy = t.clientY - (baseRect.top + state.joystick.baseY);
             updateJoystick(dx, dy);
         }
-
         function handleEnd(e) {
             e.preventDefault();
             state.joystick.active = false;
-            state.joystick.dx = 0;
-            state.joystick.dy = 0;
-            state.joystick.distance = 0;
-            // 复位滑块
-            thumb.style.top = '30%';
-            thumb.style.left = '30%';
+            state.joystick.dx = 0; state.joystick.dy = 0; state.joystick.distance = 0;
+            thumb.style.top = '30%'; thumb.style.left = '30%';
         }
-
         function updateJoystick(dx, dy) {
-            const maxDist = state.joystick.baseX * 0.8; // 最大拖拽半径
-            let dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist > maxDist) {
-                dx = dx / dist * maxDist;
-                dy = dy / dist * maxDist;
-                dist = maxDist;
-            }
-            state.joystick.dx = dx / maxDist; // 归一化 -1..1
-            state.joystick.dy = dy / maxDist;
-            state.joystick.distance = dist / maxDist; // 0..1
-
-            // 更新滑块位置
-            const percentX = (dx / maxDist) * 30 + 30; // 30%是中心偏移
-            const percentY = (dy / maxDist) * 30 + 30;
-            thumb.style.left = percentX + '%';
-            thumb.style.top = percentY + '%';
+            const maxDist = state.joystick.baseX * 0.8;
+            let dist = Math.sqrt(dx*dx+dy*dy);
+            if (dist > maxDist) { dx = dx/dist*maxDist; dy = dy/dist*maxDist; dist = maxDist; }
+            state.joystick.dx = dx/maxDist;
+            state.joystick.dy = dy/maxDist;
+            state.joystick.distance = dist/maxDist;
+            thumb.style.left = (dx/maxDist*30 + 30) + '%';
+            thumb.style.top = (dy/maxDist*30 + 30) + '%';
         }
-
-        // 触摸事件
-        base.addEventListener('touchstart', handleStart, { passive: false });
-        base.addEventListener('touchmove', handleMove, { passive: false });
+        base.addEventListener('touchstart', handleStart, {passive:false});
+        base.addEventListener('touchmove', handleMove, {passive:false});
         base.addEventListener('touchend', handleEnd);
         base.addEventListener('touchcancel', handleEnd);
-
-        // 鼠标事件（调试用）
         base.addEventListener('mousedown', handleStart);
-        window.addEventListener('mousemove', (e) => {
-            if (state.joystick.active) handleMove(e);
-        });
+        window.addEventListener('mousemove', e => { if (state.joystick.active) handleMove(e); });
         window.addEventListener('mouseup', handleEnd);
     }
 
-    // 移动处理（每帧根据摇杆状态移动）
+    let lastTime = 0;
     function processMovement(deltaTime) {
         if (!state.controlsEnabled || state.pursuitTriggered) return;
-        if (!state.joystick.active) {
-            // 没有操作，停止移动动画
+        if (!state.joystick.active || (state.joystick.dx===0 && state.joystick.dy===0)) {
             if (state.isMoving) {
                 state.isMoving = false;
                 stopJitterAnim();
@@ -468,62 +385,36 @@
             }
             return;
         }
+        const angle = Math.atan2(state.joystick.dy, state.joystick.dx);
+        if (angle >= -Math.PI/4 && angle < Math.PI/4) state.facing = 'right';
+        else if (angle >= Math.PI/4 && angle < 3*Math.PI/4) state.facing = 'down';
+        else if (angle >= -3*Math.PI/4 && angle < -Math.PI/4) state.facing = 'up';
+        else state.facing = 'left';
 
-        const joystick = state.joystick;
-        if (joystick.dx === 0 && joystick.dy === 0) return;
+        const moveAmount = CONFIG.moveSpeed * deltaTime;
+        let nx = state.charX + state.joystick.dx * moveAmount;
+        let ny = state.charY + state.joystick.dy * moveAmount;
+        nx = Math.max(CONFIG.charWidth/2, Math.min(state.worldWidth - CONFIG.charWidth/2, nx));
+        ny = Math.max(CONFIG.charHeight, Math.min(state.worldHeight - 2, ny));
 
-        // 根据角度确定朝向
-        const angle = Math.atan2(joystick.dy, joystick.dx); // -PI..PI
-        let facing = 'down';
-        if (angle >= -Math.PI/4 && angle < Math.PI/4) facing = 'right';
-        else if (angle >= Math.PI/4 && angle < 3*Math.PI/4) facing = 'down';
-        else if (angle >= -3*Math.PI/4 && angle < -Math.PI/4) facing = 'up';
-        else facing = 'left';
-        state.facing = facing;
-
-        // 计算移动距离
-        const moveAmount = CONFIG.moveSpeed * deltaTime; // 每秒移动像素 * 时间间隔
-        const dx = joystick.dx * moveAmount;
-        const dy = joystick.dy * moveAmount;
-
-        // 尝试移动
-        let newX = state.charX + dx;
-        let newY = state.charY + dy;
-
-        // 边界限制
-        newX = Math.max(CONFIG.charWidth/2, Math.min(state.worldWidth - CONFIG.charWidth/2, newX));
-        newY = Math.max(CONFIG.charHeight, Math.min(state.worldHeight - 2, newY));
-
-        const type = zoneType(newX, newY);
-        if (isWalkable(newX, newY)) {
-            state.charX = newX;
-            state.charY = newY;
+        const type = zoneType(nx, ny);
+        if (isWalkable(nx, ny)) {
+            state.charX = nx; state.charY = ny;
             updateCamera();
             checkRedZone();
-
-            // 开始移动动画
-            if (!state.isMoving) {
-                state.isMoving = true;
-                startJitterAnim();
-            }
+            if (!state.isMoving) { state.isMoving = true; startJitterAnim(); }
         } else {
-            // 阻挡提示
-            if (type === 'purple' || type === 'yellow') showBlockedMsg(type);
-            // 不能移动，但保持朝向和动画（原地踏步效果）
+            if (type==='purple' || type==='yellow') showBlockedMsg(type);
             if (!state.isMoving) {
-                state.isMoving = true;
-                startJitterAnim();
+                state.isMoving = true; startJitterAnim();
                 if (state.moveTimerId) clearTimeout(state.moveTimerId);
                 state.moveTimerId = setTimeout(() => {
-                    state.isMoving = false;
-                    stopJitterAnim();
-                    state.moveTimerId = null;
+                    state.isMoving = false; stopJitterAnim(); state.moveTimerId = null;
                 }, CONFIG.moveAnimDuration);
             }
         }
     }
 
-    // 初始对话
     function dismissInit() {
         if (state.initialDialogDismissed) return;
         state.initialDialogDismissed = true;
@@ -531,75 +422,90 @@
         initDialog.classList.add('hidden');
     }
 
-    // 游戏循环（新增deltaTime计算）
-    let lastTime = 0;
-    function gameLoop(timestamp) {
-        if (!lastTime) lastTime = timestamp;
-        let deltaTime = (timestamp - lastTime) / 1000; // 秒
-        if (deltaTime > 0.1) deltaTime = 0.1; // 防止跳帧过大
-        lastTime = timestamp;
+    function findStart() {
+        const scanStep = 8;
+        if (collisionPixelData) {
+            for (let y=0; y<state.worldHeight; y+=scanStep)
+                for (let x=0; x<state.worldWidth; x+=scanStep)
+                    if (zoneType(x,y)==='cyan') { state.charX=x; state.charY=y; return; }
+        }
+        const cx = Math.floor(state.worldWidth/2), cy = Math.floor(state.worldHeight/2);
+        if (isWalkable(cx,cy)) { state.charX=cx; state.charY=cy; return; }
+        for (let r=1; r<Math.max(state.worldWidth,state.worldHeight); r+=CONFIG.moveSpeed/4) {
+            for (let a=0; a<360; a+=20) {
+                const rad = a*Math.PI/180;
+                const tx = Math.round(cx + r*Math.cos(rad));
+                const ty = Math.round(cy + r*Math.sin(rad));
+                if (tx>=0 && tx<state.worldWidth && ty>=0 && ty<state.worldHeight && isWalkable(tx,ty)) {
+                    state.charX=tx; state.charY=ty; return;
+                }
+            }
+        }
+        state.charX=cx; state.charY=cy;
+    }
 
+    function gameLoop(ts) {
+        if (!lastTime) lastTime = ts;
+        let dt = (ts - lastTime)/1000;
+        if (dt>0.1) dt=0.1;
+        lastTime = ts;
         ctx.clearRect(0,0,CONFIG.canvasWidth, CONFIG.canvasHeight);
         drawScene();
-        processMovement(deltaTime);
+        processMovement(dt);
         drawCharacter();
         requestAnimationFrame(gameLoop);
     }
 
-    // 不再需要resizeGame动态缩放
-    function resizeGame() {}
-
-    // 寻找出生点（同之前）
-    function findStart() { /* ... */ }
-
-    // 初始化
     async function init() {
-        console.log('🎮 初始化...');
         loadingOverlay.classList.remove('done');
         loadingStatus.textContent = '加载资源中...';
         const failed = await preloadAll();
-        // ... 同之前 ...
+        if (failed.length) {
+            loadingStatus.textContent = `⚠️ ${failed.length} 个文件失败`;
+            loadingDetail.textContent = failed.join(', ');
+        } else loadingStatus.textContent = '✅ 资源加载完成';
 
         if (!initCollision()) loadingDetail.textContent += '\n碰撞图缺失！';
         if (images['scene'] && images['scene'].naturalWidth) {
             state.worldWidth = images['scene'].naturalWidth;
             state.worldHeight = images['scene'].naturalHeight;
         }
-
         findStart();
         updateCamera();
-        setupJoystick();   // 替换原来的方向键绑定
+        setupJoystick();
 
-        btnPursuit.addEventListener('click', e => { /* ... */ });
-        btnLookaround.addEventListener('click', e => { /* ... */ });
+        btnPursuit.addEventListener('click', e => {
+            e.stopPropagation();
+            if (!state.inRedZone || state.pursuitTriggered) return;
+            alert(CONFIG.pursuitAlertText);
+            state.pursuitTriggered = true;
+            state.controlsEnabled = false;
+            dialogOptions.classList.remove('visible');
+        });
+        btnLookaround.addEventListener('click', e => {
+            e.stopPropagation();
+            if (!state.inRedZone || state.pursuitTriggered) return;
+            state.redDialogDismissed = true;
+            dialogOptions.classList.remove('visible');
+        });
 
         initDialog.addEventListener('click', e => { e.stopPropagation(); dismissInit(); });
         canvas.addEventListener('click', e => { if (e.target===canvas) dismissInit(); });
-
         gameContainer.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
-        window.addEventListener('resize', resizeGame);
-        window.addEventListener('orientationchange', () => setTimeout(resizeGame,100));
-        resizeGame();
 
         loadingOverlay.classList.add('done');
         setTimeout(() => { loadingOverlay.style.display='none'; }, 600);
-
         requestAnimationFrame(gameLoop);
     }
 
-    // 注册 Service Worker（PWA）
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-            navigator.serviceWorker.register('sw.js').then(reg => {
-                console.log('SW registered');
-            }).catch(err => {
-                console.log('SW registration failed: ', err);
-            });
+            navigator.serviceWorker.register('sw.js').then(reg => console.log('SW ok')).catch(e => console.log('SW fail', e));
         });
     }
 
     init().catch(err => {
-        console.error('💥 启动失败:', err);
+        console.error('启动失败', err);
         loadingStatus.textContent = '游戏加载失败，请刷新';
     });
 })();
